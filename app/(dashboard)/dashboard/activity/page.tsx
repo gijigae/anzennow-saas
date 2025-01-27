@@ -9,10 +9,13 @@ import {
   UserMinus,
   Mail,
   CheckCircle,
+  Edit,
+  Trash,
   type LucideIcon,
 } from 'lucide-react';
 import { ActivityType } from '@/lib/db/schema';
 import { getActivityLogs } from '@/lib/db/queries';
+import { currentUser } from '@clerk/nextjs/server';
 
 const iconMap: Record<ActivityType, LucideIcon> = {
   [ActivityType.SIGN_UP]: UserPlus,
@@ -22,6 +25,8 @@ const iconMap: Record<ActivityType, LucideIcon> = {
   [ActivityType.DELETE_ACCOUNT]: UserMinus,
   [ActivityType.UPDATE_ACCOUNT]: Settings,
   [ActivityType.CREATE_TEAM]: UserPlus,
+  [ActivityType.UPDATE_TEAM]: Edit,
+  [ActivityType.DELETE_TEAM]: Trash,
   [ActivityType.REMOVE_TEAM_MEMBER]: UserMinus,
   [ActivityType.INVITE_TEAM_MEMBER]: Mail,
   [ActivityType.ACCEPT_INVITATION]: CheckCircle,
@@ -57,6 +62,10 @@ function formatAction(action: ActivityType): string {
       return 'You updated your account';
     case ActivityType.CREATE_TEAM:
       return 'You created a new team';
+    case ActivityType.UPDATE_TEAM:
+      return 'You updated the team';
+    case ActivityType.DELETE_TEAM:
+      return 'You deleted the team';
     case ActivityType.REMOVE_TEAM_MEMBER:
       return 'You removed a team member';
     case ActivityType.INVITE_TEAM_MEMBER:
@@ -69,7 +78,12 @@ function formatAction(action: ActivityType): string {
 }
 
 export default async function ActivityPage() {
-  const logs = await getActivityLogs();
+  const user = await currentUser();
+  if (!user) {
+    return null;
+  }
+
+  const logs = await getActivityLogs(user.id);
 
   return (
     <section className="flex-1 p-4 lg:p-8">
@@ -100,7 +114,7 @@ export default async function ActivityPage() {
                         {log.ipAddress && ` from IP ${log.ipAddress}`}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {getRelativeTime(new Date(log.timestamp))}
+                        {log.createdAt && getRelativeTime(new Date(log.createdAt))}
                       </p>
                     </div>
                   </li>

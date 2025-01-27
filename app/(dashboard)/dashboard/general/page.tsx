@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
-import { useUser } from '@/lib/auth';
+import { useUser } from '@clerk/nextjs';
 import { updateAccount } from '@/app/(auth)/actions';
 
 type ActionState = {
@@ -23,24 +23,20 @@ export default function GeneralPage() {
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // If you call the Server Action directly, it will automatically
-    // reset the form. We don't want that here, because we want to keep the
-    // client-side values in the inputs. So instead, we use an event handler
-    // which calls the action. You must wrap direct calls with startTransition.
-    // When you use the `action` prop it automatically handles that for you.
-    // Another option here is to persist the values to local storage. I might
-    // explore alternative options.
     startTransition(() => {
       formAction(new FormData(event.currentTarget));
     });
   };
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <section className="flex-1 p-4 lg:p-8">
       <h1 className="text-lg lg:text-2xl font-medium text-gray-900 mb-6">
         General Settings
       </h1>
-
       <Card>
         <CardHeader>
           <CardTitle>Account Information</CardTitle>
@@ -53,7 +49,7 @@ export default function GeneralPage() {
                 id="name"
                 name="name"
                 placeholder="Enter your name"
-                defaultValue={user?.name || ''}
+                defaultValue={user.fullName || ''}
                 required
               />
             </div>
@@ -64,7 +60,7 @@ export default function GeneralPage() {
                 name="email"
                 type="email"
                 placeholder="Enter your email"
-                defaultValue={user?.email || ''}
+                defaultValue={user.primaryEmailAddress?.emailAddress || ''}
                 required
               />
             </div>
