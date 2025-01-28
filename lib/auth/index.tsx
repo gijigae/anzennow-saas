@@ -1,47 +1,47 @@
 'use client';
 
-import {
-  createContext,
-  useContext,
-  ReactNode,
-  useState,
-  useEffect,
-} from 'react';
-import { use } from 'react';
-import { User } from '@/lib/db/schema';
+import { useUser as useClerkUser } from '@clerk/nextjs';
 
-type UserContextType = {
-  user: User | null;
-  setUser: (user: User | null) => void;
+export type User = {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  fullName: string | null;
+  imageUrl: string;
+  emailAddress: string;
 };
 
-const UserContext = createContext<UserContextType | null>(null);
+export function useUser() {
+  const { user, isLoaded, isSignedIn } = useClerkUser();
 
-export function useUser(): UserContextType {
-  let context = useContext(UserContext);
-  if (context === null) {
-    throw new Error('useUser must be used within a UserProvider');
+  if (!isLoaded) {
+    return {
+      user: null,
+      isLoaded: false,
+      isSignedIn: false,
+    };
   }
-  return context;
-}
 
-export function UserProvider({
-  children,
-  userPromise,
-}: {
-  children: ReactNode;
-  userPromise: Promise<User | null>;
-}) {
-  let initialUser = use(userPromise);
-  let [user, setUser] = useState<User | null>(initialUser);
+  if (!isSignedIn || !user) {
+    return {
+      user: null,
+      isLoaded: true,
+      isSignedIn: false,
+    };
+  }
 
-  useEffect(() => {
-    setUser(initialUser);
-  }, [initialUser]);
+  const formattedUser: User = {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    fullName: user.fullName,
+    imageUrl: user.imageUrl,
+    emailAddress: user.primaryEmailAddress?.emailAddress || '',
+  };
 
-  return (
-    <UserContext.Provider value={{ user, setUser }}>
-      {children}
-    </UserContext.Provider>
-  );
+  return {
+    user: formattedUser,
+    isLoaded: true,
+    isSignedIn: true,
+  };
 }
