@@ -3,9 +3,9 @@ import { redirect } from 'next/navigation';
 import { Team } from '@/lib/db/schema';
 import {
   getTeamByStripeCustomerId,
-  getUser,
   updateTeamSubscription,
 } from '@/lib/db/queries';
+import { currentUser } from '@clerk/nextjs/server';
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2024-06-20',
@@ -18,10 +18,10 @@ export async function createCheckoutSession({
   team: Team | null;
   priceId: string;
 }) {
-  const user = await getUser();
+  const user = await currentUser();
 
   if (!team || !user) {
-    redirect(`/sign-up?redirect=checkout&priceId=${priceId}`);
+    redirect(`/signup?redirect=checkout&priceId=${priceId}`);
   }
 
   const session = await stripe.checkout.sessions.create({
@@ -36,7 +36,7 @@ export async function createCheckoutSession({
     success_url: `${process.env.BASE_URL}/api/stripe/checkout?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.BASE_URL}/pricing`,
     customer: team.stripeCustomerId || undefined,
-    client_reference_id: user.id.toString(),
+    client_reference_id: user.id,
     allow_promotion_codes: true,
     subscription_data: {
       trial_period_days: 14,
@@ -48,7 +48,7 @@ export async function createCheckoutSession({
 
 export async function createCustomerPortalSession(team: Team) {
   if (!team.stripeCustomerId || !team.stripeProductId) {
-    redirect('/pricing');
+    return { url: '/pricing' };
   }
 
   let configuration: Stripe.BillingPortal.Configuration;
@@ -75,6 +75,9 @@ export async function createCustomerPortalSession(team: Team) {
         headline: 'Manage your subscription',
       },
       features: {
+        payment_method_update: {
+          enabled: true,
+        },
         subscription_update: {
           enabled: true,
           default_allowed_updates: ['price', 'quantity', 'promotion_code'],
@@ -100,15 +103,20 @@ export async function createCustomerPortalSession(team: Team) {
             ],
           },
         },
+        invoice_history: {
+          enabled: true,
+        },
       },
     });
   }
 
-  return stripe.billingPortal.sessions.create({
+  const session = await stripe.billingPortal.sessions.create({
     customer: team.stripeCustomerId,
     return_url: `${process.env.BASE_URL}/dashboard`,
     configuration: configuration.id,
   });
+
+  return { url: session.url };
 }
 
 export async function handleSubscriptionChange(

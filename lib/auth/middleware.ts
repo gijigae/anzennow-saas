@@ -1,7 +1,9 @@
 import { z } from 'zod';
-import { TeamDataWithMembers, User } from '@/lib/db/schema';
-import { getTeamForUser, getUser } from '@/lib/db/queries';
+import { Team } from '@/lib/db/schema';
+import { getTeamForUser } from '@/lib/db/queries';
 import { redirect } from 'next/navigation';
+import { currentUser } from '@clerk/nextjs/server';
+import { User } from './index';
 
 export type ActionState = {
   error?: string;
@@ -39,10 +41,19 @@ export function validatedActionWithUser<S extends z.ZodType<any, any>, T>(
   action: ValidatedActionWithUserFunction<S, T>
 ) {
   return async (prevState: ActionState, formData: FormData): Promise<T> => {
-    const user = await getUser();
-    if (!user) {
+    const clerkUser = await currentUser();
+    if (!clerkUser) {
       throw new Error('User is not authenticated');
     }
+
+    const user: User = {
+      id: clerkUser.id,
+      firstName: clerkUser.firstName,
+      lastName: clerkUser.lastName,
+      fullName: clerkUser.fullName,
+      imageUrl: clerkUser.imageUrl,
+      emailAddress: clerkUser.primaryEmailAddress?.emailAddress || '',
+    };
 
     const result = schema.safeParse(Object.fromEntries(formData));
     if (!result.success) {
@@ -55,21 +66,31 @@ export function validatedActionWithUser<S extends z.ZodType<any, any>, T>(
 
 type ActionWithTeamFunction<T> = (
   formData: FormData,
-  team: TeamDataWithMembers
+  team: Team,
+  user: User
 ) => Promise<T>;
 
 export function withTeam<T>(action: ActionWithTeamFunction<T>) {
   return async (formData: FormData): Promise<T> => {
-    const user = await getUser();
-    if (!user) {
+    const clerkUser = await currentUser();
+    if (!clerkUser) {
       redirect('/sign-in');
     }
+
+    const user: User = {
+      id: clerkUser.id,
+      firstName: clerkUser.firstName,
+      lastName: clerkUser.lastName,
+      fullName: clerkUser.fullName,
+      imageUrl: clerkUser.imageUrl,
+      emailAddress: clerkUser.primaryEmailAddress?.emailAddress || '',
+    };
 
     const team = await getTeamForUser(user.id);
     if (!team) {
       throw new Error('Team not found');
     }
 
-    return action(formData, team);
+    return action(formData, team, user);
   };
 }
